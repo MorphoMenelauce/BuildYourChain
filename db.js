@@ -46,19 +46,38 @@ function initSocket(socket) {
         callback(db[field]); // lit et renvoie la valeur associée à la clef.
     });
 
-    socket.on('set', function (field, value, callback) {
+    socket.on('set', function (field, value, timestamp, callback) {
+        if (typeof timestamp === 'function') {
+            // on réaffecte les valeurs aux bonnes variables
+            callback = timestamp;
+            timestamp = undefined;
+        }
         if (field in db) { // Si la clef est dans la base de donnée
             if (db[field] != value) {
                 console.info(`set error : Field ${field} exists and differ.`);
                 callback(false);
             } else {
+                timestamp = timestamp || Date.now();
+                if (db[field].timestamp > timestamp) {
+                    db[field].value = value;
+                    db[field].timestamp = timestamp;
+                    sockets.forEach((s, i) => {
+                        s.emit('set', field, value, timestamp, (ok) => {
+                        });
+                    });
+                }
                 callback(true);
             }
         } else {
             console.info(`set ${field} : ${value}`);
-            db[field] = value;
+            timestamp = timestamp || Date.now();
+            console.log(timestamp);
+            db[field] = {
+                value: value,
+                timestamp: timestamp
+            };
             sockets.forEach((s, i) => {
-                s.emit('set', field, value, (ok) => {
+                s.emit('set', field, value, timestamp, (ok) => {
                 });
             });
 
